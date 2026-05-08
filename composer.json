@@ -1,0 +1,11 @@
+{
+  "name": "ilyafrolov/vk-beehive-bot",
+  "description": "VK callback bot webhook on PHP 8.2",
+  "type": "project",
+  "require": {
+    "php": "^8.2",
+    "ext-curl": "*",
+    "ext-json": "*",
+    "vlucas/phpdotenv": "^5.6"
+  }
+}
