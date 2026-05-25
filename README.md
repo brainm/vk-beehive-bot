@@ -102,3 +102,29 @@ PEER_BITRIX=143581329:12,1085903959:7
 ```
 
 Формат: `from_id:bitrix_id`, несколько пар через запятую.
+
+#### 7.2) Команды telethon (my-telethon)
+
+Управление профилем Telegram через HTTP API [my-telethon](https://github.com/your-org/my-telethon) (`bot_api.php`).
+
+В `.env` vk-beehive-bot:
+
+```dotenv
+MY_TELETHON_URL=https://site.com/my-telethon
+MY_TELETHON_TOKEN=тот_же_TOKEN_что_в_my-telethon_.env
+PEER_MY_TELETHON=1085903959:1
+```
+
+`PEER_MY_TELETHON` — `vk_from_id:telethon_profile_id` (id строки в таблице `telethons`).
+
+Команды (только для привязанных `from_id`):
+
+- `telethon` — справка
+- `telethon status` — статус авторизации Telegram
+- `telethon relays` — контакты с включённой пересылкой; `telethon relays on|off` — глобальный переключатель профиля
+- `telethon get 212 5` — последние сообщения контакта (5 по умолчанию)
+- `telethon contacts имя` — поиск `contacts.id` (от 3 символов, до 20)
+- `telethon 212 send текст сообщения` — ответ контакту `#212` в Telegram
+- `telethon 212 relay on` / `off` / `true` / `false` — пересылка входящих от этого контакта в VK
+
+`212` — `contacts.id` из my-telethon (число в префиксе пересланных сообщений `[212] Имя: …`).

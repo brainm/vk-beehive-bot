@@ -6,6 +6,7 @@ use Dotenv\Dotenv;
 
 require_once __DIR__ . '/vendor/autoload.php';
 require_once __DIR__ . '/modules/bitrix.module.php';
+require_once __DIR__ . '/modules/telethon.module.php';
 
 if (class_exists(Dotenv::class) && file_exists(__DIR__ . '/.env')) {
     Dotenv::createImmutable(__DIR__)->safeLoad();
@@ -20,6 +21,9 @@ $nonceTtl = readEnvInt('VK_NONCE_TTL', 300);
 $bitrix24Url = readEnvString('BITRIX24_URL', '');
 $bitrix24Token = readEnvString('BITRIX24_TOKEN', '');
 $peerBitrixMap = bitrixParsePeerBitrixMap(readEnvString('PEER_BITRIX', ''));
+$myTelethonUrl = readEnvString('MY_TELETHON_URL', '');
+$myTelethonToken = readEnvString('MY_TELETHON_TOKEN', '');
+$peerTelethonMap = telethonParsePeerMap(readEnvString('PEER_MY_TELETHON', ''));
 
 $proxyEnabled = readEnvBool('VK_PROXY_ENABLED', false);
 $proxyList = parseProxyList(readEnvString('VK_PROXY_LIST', '[]'));
@@ -123,11 +127,20 @@ if (isNonceAlreadyProcessed($nonceStorageDir, $nonce, $nonceTtl)) {
 
 $responseText = null;
 if (str_starts_with($text, '/help')) {
-    $responseText = buildHelpText($fromId, $peerBitrixMap);
+    $responseText = buildHelpText($fromId, $peerBitrixMap, $peerTelethonMap);
 } elseif (str_starts_with($text, '/whoami')) {
     $responseText = buildWhoAmIText($payload, $message);
 } else {
     $responseText = bitrixDispatchCommand($text, $fromId, $peerBitrixMap, $bitrix24Url, $bitrix24Token);
+    if ($responseText === null) {
+        $responseText = telethonDispatchCommand(
+            $text,
+            $fromId,
+            $peerTelethonMap,
+            $myTelethonUrl,
+            $myTelethonToken
+        );
+    }
 }
 
 if ($responseText !== null && $responseText !== '' && $peerId > 0) {
@@ -188,7 +201,11 @@ function buildWhoAmIText(array $payload, array $message): string
 /**
  * @param array<int, int> $peerBitrixMap
  */
-function buildHelpText(int $fromId, array $peerBitrixMap): string
+/**
+ * @param array<int, int> $peerBitrixMap
+ * @param array<int, int> $peerTelethonMap
+ */
+function buildHelpText(int $fromId, array $peerBitrixMap, array $peerTelethonMap): string
 {
     $lines = [
         "Available commands:",
@@ -198,6 +215,16 @@ function buildHelpText(int $fromId, array $peerBitrixMap): string
 
     if (isset($peerBitrixMap[$fromId])) {
         $lines[] = "bitrix start|pause|resume|finish|timeman [YYYY-MM-DD]";
+    }
+
+    if (isset($peerTelethonMap[$fromId])) {
+        $lines[] = "telethon";
+        $lines[] = "telethon status";
+        $lines[] = "telethon relays | relays on|off";
+        $lines[] = "telethon get {contact_id} [count]";
+        $lines[] = "telethon contacts {query}";
+        $lines[] = "telethon {contact_id} send {message}";
+        $lines[] = "telethon {contact_id} relay on|off|true|false";
     }
 
     return implode("\n", $lines);
