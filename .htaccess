@@ -1,0 +1,29 @@
+# Защита служебных файлов vk-beehive-bot (Apache).
+# Для nginx настройте аналогичные location/deny в конфиге виртуального хоста.
+
+# --- Конфигурация и служебные файлы ---
+<IfModule mod_authz_core.c>
+    <Files ".env">
+        Require all denied
+    </Files>
+    <FilesMatch "\.(env|sh|lock|md)$">
+        Require all denied
+    </FilesMatch>
+</IfModule>
+
+<IfModule !mod_authz_core.c>
+    <Files ".env">
+        Order allow,deny
+        Deny from all
+    </Files>
+    <FilesMatch "\.(env|sh|lock|md)$">
+        Order allow,deny
+        Deny from all
+    </FilesMatch>
+</IfModule>
+
+# --- Запрет прямого HTTP-доступа к PHP-зависимостям и модулям ---
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(vendor|modules)/ - [F,L]
+</IfModule>

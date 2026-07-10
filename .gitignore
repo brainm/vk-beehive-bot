@@ -1,4 +1,5 @@
 .env
 /vendor/
-/logs/
-/storage/
+/dist/
+/storage/*
+!/storage/.htaccess

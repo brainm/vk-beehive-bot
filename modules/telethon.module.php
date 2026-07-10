@@ -75,6 +75,21 @@ function telethonDispatchCommand(
         return telethonHandleContactsSearch($myTelethonUrl, $myTelethonToken, $telethonId, $query);
     }
 
+    if ($sub === 'send') {
+        if (!isset($tokens[2]) || !ctype_digit($tokens[2])) {
+            return telethonUsage();
+        }
+        $contactId = (int) $tokens[2];
+        if ($contactId <= 0) {
+            return telethonUsage();
+        }
+        $message = trim(implode(' ', array_slice($tokens, 3)));
+        if ($message === '') {
+            return 'telethon error: message required after send';
+        }
+        return telethonHandleSend($myTelethonUrl, $myTelethonToken, $telethonId, $contactId, $message);
+    }
+
     if (!ctype_digit($tokens[1])) {
         return telethonUsage();
     }
@@ -89,14 +104,6 @@ function telethonDispatchCommand(
     }
 
     $action = mb_strtolower($tokens[2], 'UTF-8');
-    if ($action === 'send') {
-        $message = trim(implode(' ', array_slice($tokens, 3)));
-        if ($message === '') {
-            return 'telethon error: message required after send';
-        }
-        return telethonHandleSend($myTelethonUrl, $myTelethonToken, $telethonId, $contactId, $message);
-    }
-
     if ($action === 'relay') {
         $flagRaw = isset($tokens[3]) ? $tokens[3] : '';
         $enabled = telethonParseRelayFlag($flagRaw);
@@ -125,7 +132,7 @@ function telethonUsage(): string
         'telethon relays on|off|true|false',
         'telethon get {contact_id} [count]',
         'telethon contacts {query}',
-        'telethon {contact_id} send {text}',
+        'telethon send {contact_id} {text}',
         'telethon {contact_id} relay on|off|true|false',
         '',
         'contact_id — contacts.id (число в [212] Имя: … в VK).',

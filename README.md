@@ -33,8 +33,8 @@ BITRIX24_TOKEN=
 PEER_BITRIX=143581329:12,1085903959:7
 
 WEBHOOK_LOG_ENABLED=false
-# опционально, по умолчанию: ./logs/webhook.log
-WEBHOOK_LOG_FILE=/absolute/path/to/webhook.log
+# по умолчанию: /var/log/vk-beehive-bot/webhook.log (создаётся install.sh)
+WEBHOOK_LOG_FILE=/var/log/vk-beehive-bot/webhook.log
 ```
 
 ### 2) Локальный запуск
@@ -124,7 +124,7 @@ PEER_MY_TELETHON=1085903959:1
 - `telethon relays` — контакты с включённой пересылкой; `telethon relays on|off` — глобальный переключатель профиля
 - `telethon get 212 5` — последние сообщения контакта (5 по умолчанию)
 - `telethon contacts имя` — поиск `contacts.id` (от 3 символов, до 20)
-- `telethon 212 send текст сообщения` — ответ контакту `#212` в Telegram
+- `telethon send 212 текст сообщения` — ответ контакту `#212` в Telegram
 - `telethon 212 relay on` / `off` / `true` / `false` — пересылка входящих от этого контакта в VK
 
 `212` — `contacts.id` из my-telethon (число в префиксе пересланных сообщений `[212] Имя: …`).

@@ -29,7 +29,7 @@ $proxyEnabled = readEnvBool('VK_PROXY_ENABLED', false);
 $proxyList = parseProxyList(readEnvString('VK_PROXY_LIST', '[]'));
 
 $loggingEnabled = readEnvBool('WEBHOOK_LOG_ENABLED', false);
-$logFile = readEnvString('WEBHOOK_LOG_FILE', __DIR__ . '/logs/webhook.log');
+$logFile = readEnvString('WEBHOOK_LOG_FILE', '/var/log/vk-beehive-bot/webhook.log');
 $nonceStorageDir = __DIR__ . '/storage/nonces';
 
 if ($vkSecretKey === '') {
@@ -223,7 +223,7 @@ function buildHelpText(int $fromId, array $peerBitrixMap, array $peerTelethonMap
         $lines[] = "telethon relays | relays on|off";
         $lines[] = "telethon get {contact_id} [count]";
         $lines[] = "telethon contacts {query}";
-        $lines[] = "telethon {contact_id} send {message}";
+        $lines[] = "telethon send {contact_id} {message}";
         $lines[] = "telethon {contact_id} relay on|off|true|false";
     }
 
