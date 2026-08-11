@@ -330,7 +330,12 @@ function telethonHandleSend(
     if (!$result['ok']) {
         return 'telethon error: ' . telethonFormatError($result);
     }
-    return 'telethon: sent to contact #' . $contactId;
+    $data = $result['data'] ?? [];
+    $reply = 'telethon: sent to contact #' . $contactId;
+    if (!empty($data['relay_enabled'])) {
+        $reply .= ', relay on';
+    }
+    return $reply;
 }
 
 function telethonHandleRelay(

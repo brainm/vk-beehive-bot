@@ -58,6 +58,18 @@ Webhook endpoint: `http://localhost:8080/hook.php`
 - `/help` — список команд
 - `/whoami` — JSON-контекст события (peer, from, event, message)
 
+### 4.1) Прокси `message_read` → all-notifications
+
+Если в сообществе включено событие **«Прочтение сообщений»**, `hook.php` при `message_read` делает POST на all-notifications:
+
+```dotenv
+ALL_NOTIFICATIONS_ENABLED=true
+ALL_NOTIFICATIONS_TOKEN=тот_же_что_VK_CALLBACK_TOKEN_в_all-notifications
+ALL_NOTIFICATIONS_VK_CALLBACK_URL=https://panel.1beehive.ru/notifications/vk-callback.php
+```
+
+Заголовок: `X-Authorization: <ALL_NOTIFICATIONS_TOKEN>`. Тело — исходный JSON события VK.
+
 ### 5) Nonce (антидублирование)
 
 Для защиты от повторной обработки события используется nonce:

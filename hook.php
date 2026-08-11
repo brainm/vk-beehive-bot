@@ -25,6 +25,10 @@ $myTelethonUrl = readEnvString('MY_TELETHON_URL', '');
 $myTelethonToken = readEnvString('MY_TELETHON_TOKEN', '');
 $peerTelethonMap = telethonParsePeerMap(readEnvString('PEER_MY_TELETHON', ''));
 
+$allNotificationsEnabled = readEnvBool('ALL_NOTIFICATIONS_ENABLED', false);
+$allNotificationsToken = readEnvString('ALL_NOTIFICATIONS_TOKEN', '');
+$allNotificationsVkCallbackUrl = readEnvString('ALL_NOTIFICATIONS_VK_CALLBACK_URL', '');
+
 $proxyEnabled = readEnvBool('VK_PROXY_ENABLED', false);
 $proxyList = parseProxyList(readEnvString('VK_PROXY_LIST', '[]'));
 
@@ -103,6 +107,25 @@ if ($receivedSecret === '' || !hash_equals($vkSecretKey, $receivedSecret)) {
     exit;
 }
 
+if ($type === 'message_read') {
+    if ($allNotificationsEnabled) {
+        $forwardResult = forwardMessageReadToAllNotifications(
+            $allNotificationsVkCallbackUrl,
+            $allNotificationsToken,
+            $payload,
+            $vkTimeout
+        );
+        logWebhook($loggingEnabled, $logFile, [
+            'event' => 'all_notifications_forward',
+            'type' => 'message_read',
+            'result' => $forwardResult,
+        ]);
+    }
+    http_response_code(200);
+    echo 'ok';
+    exit;
+}
+
 if ($type !== 'message_new') {
     http_response_code(200);
     echo 'ok';
@@ -174,6 +197,59 @@ rememberNonce($nonceStorageDir, $nonce);
 
 http_response_code(200);
 echo 'ok';
+
+/**
+ * @param array<string, mixed> $payload
+ * @return array<string, mixed>
+ */
+function forwardMessageReadToAllNotifications(
+    string $url,
+    string $token,
+    array $payload,
+    int $timeout
+): array {
+    if ($url === '') {
+        return ['ok' => false, 'error' => 'ALL_NOTIFICATIONS_VK_CALLBACK_URL is not set'];
+    }
+    if ($token === '') {
+        return ['ok' => false, 'error' => 'ALL_NOTIFICATIONS_TOKEN is not set'];
+    }
+
+    $body = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if (!is_string($body)) {
+        return ['ok' => false, 'error' => 'json_encode failed'];
+    }
+
+    $ch = curl_init($url);
+    if ($ch === false) {
+        return ['ok' => false, 'error' => 'curl_init failed'];
+    }
+
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => $timeout,
+        CURLOPT_POSTFIELDS => $body,
+        CURLOPT_HTTPHEADER => [
+            'Content-Type: application/json',
+            'X-Authorization: ' . $token,
+        ],
+    ]);
+
+    $responseBody = curl_exec($ch);
+    $curlError = curl_error($ch);
+    $httpCode = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+    curl_close($ch);
+
+    $ok = $curlError === '' && $httpCode >= 200 && $httpCode < 300;
+    return [
+        'ok' => $ok,
+        'http_code' => $httpCode,
+        'curl_error' => $curlError !== '' ? $curlError : null,
+        'response_body' => is_string($responseBody) ? $responseBody : null,
+        'url' => $url,
+    ];
+}
 
 /**
  * @param array<string, mixed> $payload
