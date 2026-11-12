@@ -22,6 +22,10 @@ function bitrixDispatchCommand(
         return null;
     }
 
+    if (count($tokens) > 3) {
+        return bitrixUsage();
+    }
+    $time = null;
     $action = isset($tokens[1]) ? mb_strtolower($tokens[1], 'UTF-8') : '';
     if ($action === 'timeman') {
         $date = isset($tokens[2]) ? trim($tokens[2]) : '';
@@ -30,6 +34,11 @@ function bitrixDispatchCommand(
         }
     } elseif (!in_array($action, ['start', 'pause', 'resume', 'finish'], true)) {
         return bitrixUsage();
+    } elseif (isset($tokens[2])) {
+        if (!preg_match('/^(\d{1,2})(?::([0-5]\d))?$/', $tokens[2], $matches) || (int) $matches[1] > 23) {
+            return 'Некорректное время. Используйте час от 0 до 23: например, 9, 9:00 или 09:00.';
+        }
+        $time = sprintf('%02d:%02d', (int) $matches[1], (int) ($matches[2] ?? 0));
     }
 
     $bitrixUserId = $peerBitrixMap[$fromId] ?? null;
@@ -53,22 +62,26 @@ function bitrixDispatchCommand(
         return bitrixFormatTimeman($data);
     }
 
-    $result = bitrixSendTimeman($bitrix24Url, $bitrix24Token, $bitrixUserId, $action);
+    $result = bitrixSendTimeman($bitrix24Url, $bitrix24Token, $bitrixUserId, $action, $time);
     if (!$result['ok']) {
         return (string) ($result['error'] ?? 'bitrix error');
     }
-    return 'bitrix: ok';
+    $status = bitrixFetchTimeman($bitrix24Url, $bitrix24Token, $bitrixUserId, null);
+    if (!$status['ok']) {
+        return 'Команда выполнена, но не удалось получить табель: ' . ($status['error'] ?? 'неизвестная ошибка');
+    }
+    return bitrixFormatTimeman($status['data']);
 }
 
 function bitrixUsage(): string
 {
-    return 'Usage: bitrix start|pause|resume|finish|timeman [YYYY-MM-DD]';
+    return "Команды: bitrix start|pause|resume|finish [H или HH:MM] (сегодня)\nbitrix timeman [YYYY-MM-DD]";
 }
 
 /**
  * @return array<string, mixed>
  */
-function bitrixSendTimeman(string $bitrix24Url, string $bitrix24Token, int $bitrixUserId, string $action): array
+function bitrixSendTimeman(string $bitrix24Url, string $bitrix24Token, int $bitrixUserId, string $action, ?string $time = null): array
 {
     if ($bitrix24Url === '') {
         return ['ok' => false, 'error' => 'bitrix_url_missing'];
@@ -80,6 +93,7 @@ function bitrixSendTimeman(string $bitrix24Url, string $bitrix24Token, int $bitr
     $payload = json_encode([
         'userId' => $bitrixUserId,
         'do' => $action,
+        'time' => $time,
     ], JSON_UNESCAPED_UNICODE);
     if (!is_string($payload)) {
         return ['ok' => false, 'error' => 'encode_failed'];
@@ -111,34 +125,7 @@ function bitrixSendTimeman(string $bitrix24Url, string $bitrix24Token, int $bitr
     if ($curlErrno !== 0) {
         return ['ok' => false, 'error' => 'curl_error: ' . $curlError];
     }
-    if ($httpCode < 200 || $httpCode >= 300) {
-        return ['ok' => false, 'error' => 'http_error: ' . $httpCode];
-    }
-
-    $trimmed = trim((string) ($response ?? ''));
-    if ($trimmed === '') {
-        return ['ok' => false, 'error' => 'empty_response'];
-    }
-
-    $data = json_decode($trimmed, true);
-    if (is_array($data)) {
-        if (!empty($data['ok']) || !empty($data['OK'])) {
-            return ['ok' => true];
-        }
-        if (isset($data['error'])) {
-            return ['ok' => false, 'error' => (string) $data['error']];
-        }
-        if (isset($data['message'])) {
-            return ['ok' => false, 'error' => (string) $data['message']];
-        }
-        return ['ok' => false, 'error' => $trimmed];
-    }
-
-    if (strcasecmp($trimmed, 'ok') === 0) {
-        return ['ok' => true];
-    }
-
-    return ['ok' => false, 'error' => $trimmed];
+    return bitrixDecodeTimemanResponse((string) ($response ?? ''), $httpCode, true);
 }
 
 /**
@@ -184,16 +171,41 @@ function bitrixFetchTimeman(string $bitrix24Url, string $bitrix24Token, int $bit
     if ($curlErrno !== 0) {
         return ['ok' => false, 'error' => 'curl_error: ' . $curlError];
     }
+    return bitrixDecodeTimemanResponse((string) ($response ?? ''), $httpCode, false);
+}
+
+/** @return array<string, mixed> */
+function bitrixDecodeTimemanResponse(string $response, int $httpCode, bool $mutation): array
+{
+    $trimmed = trim($response);
+    $data = json_decode($trimmed, true);
+    if (is_array($data)) {
+        $error = $data['ERROR'] ?? $data['error'] ?? null;
+        if ($error === null && ($httpCode < 200 || $httpCode >= 300 || ($mutation && empty($data['ok']) && empty($data['OK'])))) {
+            $error = $data['message'] ?? null;
+        }
+        if (is_string($error) && $error !== '') {
+            $messages = [
+                'No timeman entry for this date; start the work day first' => 'Рабочий день сегодня ещё не начат. Сначала выполните bitrix start [время].',
+                'No timeman entry for this date' => 'За указанную дату нет отчётного периода.',
+                'Work day for this date is already closed' => 'Рабочий день за эту дату уже завершён.',
+                'Entry is not paused; pause first before resume' => 'Рабочий день не на паузе. Сначала выполните bitrix pause [время].',
+                'Finish time must be after start time' => 'Время завершения должно быть позже времени начала рабочего дня.',
+                'Break duration (TIME_LEAKS) exceeds work day duration' => 'Длительность перерывов превышает длительность рабочего дня.',
+            ];
+            return ['ok' => false, 'error' => $messages[$error] ?? $error];
+        }
+    }
     if ($httpCode < 200 || $httpCode >= 300) {
-        return ['ok' => false, 'error' => 'http_error: ' . $httpCode];
+        return ['ok' => false, 'error' => 'Ошибка API Bitrix: HTTP ' . $httpCode . '.'];
     }
-
-    $data = json_decode((string) ($response ?? ''), true);
-    if (!is_array($data)) {
-        return ['ok' => false, 'error' => 'invalid_response'];
+    if ($mutation && ((is_array($data) && (!empty($data['ok']) || !empty($data['OK']))) || strcasecmp($trimmed, 'ok') === 0)) {
+        return ['ok' => true];
     }
-
-    return ['ok' => true, 'data' => $data];
+    if (!$mutation && is_array($data)) {
+        return ['ok' => true, 'data' => $data];
+    }
+    return ['ok' => false, 'error' => $trimmed === '' ? 'empty_response' : 'invalid_response'];
 }
 
 function bitrixFormatTimeman(array $data): string
@@ -227,7 +239,7 @@ function bitrixFormatTimeman(array $data): string
         $startAt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $start);
         if ($startAt) {
             $finishAt = null;
-            if ($finish !== '') {
+            if ($finish !== '' && $status === 'CLOSED') {
                 $finishAt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $finish);
             }
             if (!$finishAt) {
@@ -270,7 +282,7 @@ function bitrixFormatTimeman(array $data): string
         }
     }
     if ($finishText !== '') {
-        $parts[] = 'Завершение: ' . $finishText;
+        $parts[] = ($status === 'PAUSED' ? 'Пауза с: ' : 'Завершение: ') . $finishText;
     }
 
     return implode(', ', $parts);

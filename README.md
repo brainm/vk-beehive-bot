@@ -101,11 +101,17 @@ VK_TIMEOUT=15
 
 #### 7.1) Команды bitrix
 
-- `bitrix start`
-- `bitrix pause`
-- `bitrix resume`
-- `bitrix finish`
+- `bitrix start [H или HH:MM]`
+- `bitrix pause [H или HH:MM]`
+- `bitrix resume [H или HH:MM]`
+- `bitrix finish [H или HH:MM]`
 - `bitrix timeman [YYYY-MM-DD]`
+
+Время необязательно: `9`, `9:00` и `09:00` означают 09:00 сегодняшнего дня по часовому поясу сервера Bitrix. Без аргумента используется текущее время. После успешной команды возвращается актуальный `bitrix timeman`.
+
+`start` не открывает новый период и не меняет начало, пока предыдущий период не завершён (включая паузу и прошлые даты): в ответе указаны его начало и длительность.
+
+Для этих возможностей нужно обновить также `extensions/bitrix/api.php` в проекте `admins`.
 
 Связь пользователя VK (`from_id`) с Bitrix user id задается через `PEER_BITRIX`:
 

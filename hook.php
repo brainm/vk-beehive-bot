@@ -290,7 +290,7 @@ function buildHelpText(int $fromId, array $peerBitrixMap, array $peerTelethonMap
     ];
 
     if (isset($peerBitrixMap[$fromId])) {
-        $lines[] = "bitrix start|pause|resume|finish|timeman [YYYY-MM-DD]";
+        $lines[] = "bitrix start|pause|resume|finish [H или HH:MM] (сегодня)\nbitrix timeman [YYYY-MM-DD]";
     }
 
     if (isset($peerTelethonMap[$fromId])) {
