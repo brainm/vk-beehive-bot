@@ -66,7 +66,7 @@ function bitrixDispatchCommand(
     if (!$result['ok']) {
         return (string) ($result['error'] ?? 'bitrix error');
     }
-    $status = bitrixFetchTimeman($bitrix24Url, $bitrix24Token, $bitrixUserId, null);
+    $status = bitrixFetchTimeman($bitrix24Url, $bitrix24Token, $bitrixUserId, isset($result['data']['date']) ? (string) $result['data']['date'] : null);
     if (!$status['ok']) {
         return 'Команда выполнена, но не удалось получить табель: ' . ($status['error'] ?? 'неизвестная ошибка');
     }
@@ -75,7 +75,7 @@ function bitrixDispatchCommand(
 
 function bitrixUsage(): string
 {
-    return "Команды: bitrix start|pause|resume|finish [H или HH:MM] (сегодня)\nbitrix timeman [YYYY-MM-DD]";
+    return "Команды: bitrix start|pause|resume|finish [H или HH:MM] (finish — дата начала незавершённого периода)\nbitrix timeman [YYYY-MM-DD]";
 }
 
 /**
@@ -200,7 +200,7 @@ function bitrixDecodeTimemanResponse(string $response, int $httpCode, bool $muta
         return ['ok' => false, 'error' => 'Ошибка API Bitrix: HTTP ' . $httpCode . '.'];
     }
     if ($mutation && ((is_array($data) && (!empty($data['ok']) || !empty($data['OK']))) || strcasecmp($trimmed, 'ok') === 0)) {
-        return ['ok' => true];
+        return ['ok' => true, 'data' => is_array($data) ? $data : []];
     }
     if (!$mutation && is_array($data)) {
         return ['ok' => true, 'data' => $data];
