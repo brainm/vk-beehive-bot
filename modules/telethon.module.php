@@ -131,6 +131,7 @@ function telethonUsage(): string
         'contact_id — ID контакта vkomander (тот же номер в интерфейсе и пересылке).',
         'get — последние сообщения (count по умолчанию 5, макс. 50).',
         'contacts — поиск в БД (от 3 символов, до 20 результатов).',
+        'send — отправить сообщение и включить relay контакта после успешной отправки.',
         'relay без флага — переключить пересылку контакта; on/off — задать состояние.',
         'relays без флага — контакты с пересылкой; on/off — глобальный переключатель.',
     ]);
@@ -338,6 +339,9 @@ function telethonHandleSend(
     $reply = 'telethon: sent to contact #' . $contactId;
     if (!empty($data['relay_enabled'])) {
         $reply .= ', relay on';
+    } elseif (!empty($data['relay_error'])) {
+        $reply .= ', relay activation failed: ' . (string) $data['relay_error']
+            . '; use telethon relay ' . $contactId . ' on';
     }
     return $reply;
 }
