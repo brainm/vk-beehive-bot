@@ -9,8 +9,8 @@ function telethonDispatchCommand(
     string $text,
     int $fromId,
     array $peerTelethonMap,
-    string $myTelethonUrl,
-    string $myTelethonToken
+    string $vkomanderUrl,
+    string $vkomanderToken
 ): ?string {
     $tokens = bitrixTokenizeCommand($text);
     if (count($tokens) === 0) {
@@ -24,14 +24,14 @@ function telethonDispatchCommand(
 
     $telethonId = $peerTelethonMap[$fromId] ?? null;
     if (!is_int($telethonId) || $telethonId <= 0) {
-        return 'telethon error: profile not linked (PEER_MY_TELETHON)';
+        return 'telethon error: profile not linked (PEER_VKOMANDER)';
     }
 
-    if ($myTelethonUrl === '') {
-        return 'telethon error: MY_TELETHON_URL missing';
+    if ($vkomanderUrl === '') {
+        return 'telethon error: VKOMANDER_URL missing';
     }
-    if ($myTelethonToken === '') {
-        return 'telethon error: MY_TELETHON_TOKEN missing';
+    if ($vkomanderToken === '') {
+        return 'telethon error: VKOMANDER_TOKEN missing';
     }
 
     if (count($tokens) === 1) {
@@ -41,7 +41,7 @@ function telethonDispatchCommand(
     $sub = mb_strtolower($tokens[1], 'UTF-8');
 
     if ($sub === 'status') {
-        return telethonHandleStatus($myTelethonUrl, $myTelethonToken, $telethonId);
+        return telethonHandleStatus($vkomanderUrl, $vkomanderToken, $telethonId, $fromId);
     }
 
     if ($sub === 'relays') {
@@ -50,9 +50,9 @@ function telethonDispatchCommand(
             if ($enabled === null) {
                 return 'telethon error: use relays on|off|true|false';
             }
-            return telethonHandleProfileRelays($myTelethonUrl, $myTelethonToken, $telethonId, $enabled);
+            return telethonHandleProfileRelays($vkomanderUrl, $vkomanderToken, $telethonId, $fromId, $enabled);
         }
-        return telethonHandleRelaysList($myTelethonUrl, $myTelethonToken, $telethonId);
+        return telethonHandleRelaysList($vkomanderUrl, $vkomanderToken, $telethonId, $fromId);
     }
 
     if ($sub === 'get') {
@@ -64,7 +64,7 @@ function telethonDispatchCommand(
         if (isset($tokens[3]) && ctype_digit($tokens[3])) {
             $count = max(1, min(50, (int) $tokens[3]));
         }
-        return telethonHandleGet($myTelethonUrl, $myTelethonToken, $telethonId, $contactId, $count);
+        return telethonHandleGet($vkomanderUrl, $vkomanderToken, $telethonId, $fromId, $contactId, $count);
     }
 
     if ($sub === 'contacts') {
@@ -72,7 +72,7 @@ function telethonDispatchCommand(
         if (mb_strlen($query) < 3) {
             return 'telethon error: contacts query min 3 chars';
         }
-        return telethonHandleContactsSearch($myTelethonUrl, $myTelethonToken, $telethonId, $query);
+        return telethonHandleContactsSearch($vkomanderUrl, $vkomanderToken, $telethonId, $fromId, $query);
     }
 
     if ($sub === 'send') {
@@ -87,33 +87,26 @@ function telethonDispatchCommand(
         if ($message === '') {
             return 'telethon error: message required after send';
         }
-        return telethonHandleSend($myTelethonUrl, $myTelethonToken, $telethonId, $contactId, $message);
+        return telethonHandleSend($vkomanderUrl, $vkomanderToken, $telethonId, $fromId, $contactId, $message);
     }
 
-    if (!ctype_digit($tokens[1])) {
-        return telethonUsage();
-    }
-
-    $contactId = (int) $tokens[1];
-    if ($contactId <= 0) {
-        return telethonUsage();
-    }
-
-    if (!isset($tokens[2])) {
-        return telethonUsage();
-    }
-
-    $action = mb_strtolower($tokens[2], 'UTF-8');
-    if ($action === 'relay') {
-        $flagRaw = isset($tokens[3]) ? $tokens[3] : '';
-        $enabled = telethonParseRelayFlag($flagRaw);
-        if ($enabled === null) {
-            return 'telethon error: use relay on|off|true|false';
+    if ($sub === 'relay') {
+        if (!isset($tokens[2]) || !ctype_digit($tokens[2]) || (int)$tokens[2] <= 0 || count($tokens) > 4) {
+            return telethonUsage();
+        }
+        $contactId = (int)$tokens[2];
+        $enabled = null;
+        if (isset($tokens[3])) {
+            $enabled = telethonParseRelayFlag($tokens[3]);
+            if ($enabled === null) {
+                return 'telethon error: use relay {contact_id} [on|off|true|false]';
+            }
         }
         return telethonHandleRelay(
-            $myTelethonUrl,
-            $myTelethonToken,
+            $vkomanderUrl,
+            $vkomanderToken,
             $telethonId,
+            $fromId,
             $contactId,
             $enabled
         );
@@ -125,7 +118,7 @@ function telethonDispatchCommand(
 function telethonUsage(): string
 {
     return implode("\n", [
-        'telethon — команды профиля Telegram (my-telethon):',
+        'telethon — команды профиля Telegram (vkomander):',
         'telethon',
         'telethon status',
         'telethon relays',
@@ -133,11 +126,12 @@ function telethonUsage(): string
         'telethon get {contact_id} [count]',
         'telethon contacts {query}',
         'telethon send {contact_id} {text}',
-        'telethon {contact_id} relay on|off|true|false',
+        'telethon relay {contact_id} [on|off|true|false]',
         '',
-        'contact_id — contacts.id (число в [212] Имя: … в VK).',
+        'contact_id — ID контакта vkomander (тот же номер в интерфейсе и пересылке).',
         'get — последние сообщения (count по умолчанию 5, макс. 50).',
         'contacts — поиск в БД (от 3 символов, до 20 результатов).',
+        'relay без флага — переключить пересылку контакта; on/off — задать состояние.',
         'relays без флага — контакты с пересылкой; on/off — глобальный переключатель.',
     ]);
 }
@@ -154,10 +148,11 @@ function telethonParseRelayFlag(string $raw): ?bool
     return null;
 }
 
-function telethonHandleRelaysList(string $baseUrl, string $token, int $telethonId): string
+function telethonHandleRelaysList(string $baseUrl, string $token, int $telethonId, int $vkFromId): string
 {
     $result = telethonApiRequest($baseUrl, $token, 'relays_list', [
         'telethon_id' => $telethonId,
+        'vk_from_id' => $vkFromId,
     ]);
     if (!$result['ok']) {
         return 'telethon error: ' . telethonFormatError($result);
@@ -191,10 +186,12 @@ function telethonHandleProfileRelays(
     string $baseUrl,
     string $token,
     int $telethonId,
+    int $vkFromId,
     bool $enabled
 ): string {
     $result = telethonApiRequest($baseUrl, $token, 'profile_relays', [
         'telethon_id' => $telethonId,
+        'vk_from_id' => $vkFromId,
         'enabled' => $enabled,
     ]);
     if (!$result['ok']) {
@@ -208,11 +205,13 @@ function telethonHandleGet(
     string $baseUrl,
     string $token,
     int $telethonId,
+    int $vkFromId,
     int $contactId,
     int $count
 ): string {
     $result = telethonApiRequest($baseUrl, $token, 'messages', [
         'telethon_id' => $telethonId,
+        'vk_from_id' => $vkFromId,
         'contact_id' => $contactId,
         'count' => $count,
     ]);
@@ -260,10 +259,12 @@ function telethonHandleContactsSearch(
     string $baseUrl,
     string $token,
     int $telethonId,
+    int $vkFromId,
     string $query
 ): string {
     $result = telethonApiRequest($baseUrl, $token, 'contacts_search', [
         'telethon_id' => $telethonId,
+        'vk_from_id' => $vkFromId,
         'query' => $query,
     ]);
     if (!$result['ok']) {
@@ -296,10 +297,11 @@ function telethonHandleContactsSearch(
     return implode("\n", $lines);
 }
 
-function telethonHandleStatus(string $baseUrl, string $token, int $telethonId): string
+function telethonHandleStatus(string $baseUrl, string $token, int $telethonId, int $vkFromId): string
 {
     $result = telethonApiRequest($baseUrl, $token, 'status', [
         'telethon_id' => $telethonId,
+        'vk_from_id' => $vkFromId,
     ]);
     if (!$result['ok']) {
         return 'telethon error: ' . telethonFormatError($result);
@@ -319,11 +321,13 @@ function telethonHandleSend(
     string $baseUrl,
     string $token,
     int $telethonId,
+    int $vkFromId,
     int $contactId,
     string $message
 ): string {
     $result = telethonApiRequest($baseUrl, $token, 'send', [
         'telethon_id' => $telethonId,
+        'vk_from_id' => $vkFromId,
         'contact_id' => $contactId,
         'message' => $message,
     ]);
@@ -342,18 +346,23 @@ function telethonHandleRelay(
     string $baseUrl,
     string $token,
     int $telethonId,
+    int $vkFromId,
     int $contactId,
-    bool $enabled
+    ?bool $enabled
 ): string {
-    $result = telethonApiRequest($baseUrl, $token, 'relay', [
+    $payload = [
         'telethon_id' => $telethonId,
+        'vk_from_id' => $vkFromId,
         'contact_id' => $contactId,
-        'enabled' => $enabled,
-    ]);
+    ];
+    if ($enabled !== null) {
+        $payload['enabled'] = $enabled;
+    }
+    $result = telethonApiRequest($baseUrl, $token, 'relay', $payload);
     if (!$result['ok']) {
         return 'telethon error: ' . telethonFormatError($result);
     }
-    $state = $enabled ? 'on' : 'off';
+    $state = !empty($result['data']['relay_enabled']) ? 'on' : 'off';
     return 'telethon: relay [' . $contactId . '] ' . $state;
 }
 

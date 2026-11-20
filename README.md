@@ -123,17 +123,17 @@ PEER_BITRIX=143581329:12,1085903959:7
 
 #### 7.2) Команды telethon (my-telethon)
 
-Управление профилем Telegram через HTTP API [my-telethon](https://github.com/your-org/my-telethon) (`bot_api.php`).
+Управление Telegram через единый API vkomander (`bot_api.php`); vkomander обращается к Python my-telethon.
 
 В `.env` vk-beehive-bot:
 
 ```dotenv
-MY_TELETHON_URL=https://site.com/my-telethon
-MY_TELETHON_TOKEN=тот_же_TOKEN_что_в_my-telethon_.env
-PEER_MY_TELETHON=1085903959:1
+VKOMANDER_URL=https://site.com/vkomander
+VKOMANDER_TOKEN=тот_же_BOT_API_TOKEN_что_в_vkomander_.env
+PEER_VKOMANDER=1085903959:1
 ```
 
-`PEER_MY_TELETHON` — `vk_from_id:telethon_profile_id` (id строки в таблице `telethons`).
+`PEER_VKOMANDER` — `vk_from_id:telethon_profile_id` (id строки в таблице `telethons`).
 
 Команды (только для привязанных `from_id`):
 
@@ -141,8 +141,13 @@ PEER_MY_TELETHON=1085903959:1
 - `telethon status` — статус авторизации Telegram
 - `telethon relays` — контакты с включённой пересылкой; `telethon relays on|off` — глобальный переключатель профиля
 - `telethon get 212 5` — последние сообщения контакта (5 по умолчанию)
-- `telethon contacts имя` — поиск `contacts.id` (от 3 символов, до 20)
+- `telethon contacts имя` — поиск ID контакта vkomander (от 3 символов, до 20)
 - `telethon send 212 текст сообщения` — ответ контакту `#212` в Telegram
-- `telethon 212 relay on` / `off` / `true` / `false` — пересылка входящих от этого контакта в VK
+- `telethon relay 212 on` / `off` / `true` / `false` — пересылка входящих от этого контакта в VK
+- `telethon relay 212` — переключить пересылку контакта и показать новое состояние
 
-`212` — `contacts.id` из my-telethon (число в префиксе пересланных сообщений `[212] Имя: …`).
+`212` — `contacts.id` из vkomander (число в префиксе пересланных сообщений `[212] Имя: …`).
+
+### Переход на vkomander
+
+Бот не обращается к my-telethon напрямую. Замените `MY_TELETHON_URL`, `MY_TELETHON_TOKEN`, `PEER_MY_TELETHON` на `VKOMANDER_URL`, `VKOMANDER_TOKEN`, `PEER_VKOMANDER`. Токен должен совпадать с `BOT_API_TOKEN` vkomander; числовые привязки профилей сохраняются, если соответствуют профилям vkomander. Сервер проверяет VK-пользователя по bindings. Все ID контактов берутся из vkomander. Прежние номера my-telethon могут означать другого собеседника — используйте `telethon contacts имя`. Правила и глобальный переключатель пересылки хранятся только в vkomander; отправка ответа не включает пересылку автоматически.

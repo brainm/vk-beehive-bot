@@ -21,9 +21,9 @@ $nonceTtl = readEnvInt('VK_NONCE_TTL', 300);
 $bitrix24Url = readEnvString('BITRIX24_URL', '');
 $bitrix24Token = readEnvString('BITRIX24_TOKEN', '');
 $peerBitrixMap = bitrixParsePeerBitrixMap(readEnvString('PEER_BITRIX', ''));
-$myTelethonUrl = readEnvString('MY_TELETHON_URL', '');
-$myTelethonToken = readEnvString('MY_TELETHON_TOKEN', '');
-$peerTelethonMap = telethonParsePeerMap(readEnvString('PEER_MY_TELETHON', ''));
+$vkomanderUrl = readEnvString('VKOMANDER_URL', '');
+$vkomanderToken = readEnvString('VKOMANDER_TOKEN', '');
+$peerTelethonMap = telethonParsePeerMap(readEnvString('PEER_VKOMANDER', ''));
 
 $allNotificationsEnabled = readEnvBool('ALL_NOTIFICATIONS_ENABLED', false);
 $allNotificationsToken = readEnvString('ALL_NOTIFICATIONS_TOKEN', '');
@@ -160,8 +160,8 @@ if (str_starts_with($text, '/help')) {
             $text,
             $fromId,
             $peerTelethonMap,
-            $myTelethonUrl,
-            $myTelethonToken
+            $vkomanderUrl,
+            $vkomanderToken
         );
     }
 }
@@ -300,7 +300,7 @@ function buildHelpText(int $fromId, array $peerBitrixMap, array $peerTelethonMap
         $lines[] = "telethon get {contact_id} [count]";
         $lines[] = "telethon contacts {query}";
         $lines[] = "telethon send {contact_id} {message}";
-        $lines[] = "telethon {contact_id} relay on|off|true|false";
+        $lines[] = "telethon relay {contact_id} [on|off|true|false]";
     }
 
     return implode("\n", $lines);
